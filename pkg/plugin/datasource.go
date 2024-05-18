@@ -4,8 +4,10 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	// "io"
 	"net/http"
+	// "time"
 
 	"github.com/accuknox/kubearmor-plugin/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -26,6 +28,8 @@ var (
 	_ instancemgmt.InstanceDisposer = (*Datasource)(nil)
 )
 var Backend string = ""
+var NodeRows int = 1
+var EdgeRows int = 1
 
 const (
 	pts0   = "pts0"
@@ -40,10 +44,13 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		return nil, fmt.Errorf("http client options: %w", err)
 	}
 	PluginSettings, err := models.LoadPluginSettings(settings)
-	Backend = PluginSettings.Backend
+
 	if err != nil {
 		return nil, fmt.Errorf("Error in plugin settings: %w", err)
 	}
+
+	Backend = PluginSettings.Backend
+
 	cl, err := httpclient.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("httpclient new: %w", err)
@@ -75,44 +82,21 @@ func (d *Datasource) Dispose() {
 // The QueryDataResponse contains a map of RefID to the response for each query, and each response
 // contains Frames ([]*Frame).
 
-// func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-// 	// create response struct
-// 	response := backend.NewQueryDataResponse()
-//
-// 	// loop over queries and execute them individually.
-// 	for _, q := range req.Queries {
-// 		res := d.query(ctx, req.PluginContext, q)
-//
-// 		// save the response in a hashmap
-// 		// based on with RefID as identifier
-// 		response.Responses[q.RefID] = res
-//
-// 	}
-//
-// 	return response, nil
-// }
+func (d *Datasource) QueryData(ctx context.Context, req *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
+	// create response struct
+	response := backend.NewQueryDataResponse()
 
-func (d *Datasource) QueryData(ctx context.Context, r *backend.QueryDataRequest) (*backend.QueryDataResponse, error) {
-	var dataResps backend.Responses
-	for _, query := range r.Queries {
-		frame := data.NewFrame("Nodes")
-		frame.RefID = query.RefID
-		frame.Meta = &data.FrameMeta{
-			// TODO: Add metadata
-		}
+	// loop over queries and execute them individually.
+	for _, q := range req.Queries {
+		res := d.query(ctx, req.PluginContext, q)
 
-		nodeFields := make([]*data.Field, 0)
-		nodeFields = append(nodeFields, data.NewField("foo", nil, []int64{1, 2, 3}))
-		frame.Fields = nodeFields
+		// save the response in a hashmap
+		// based on with RefID as identifier
+		response.Responses[q.RefID] = res
 
-		dataResps[query.RefID] = backend.DataResponse{
-			Frames: data.Frames{frame},
-		}
 	}
 
-	return &backend.QueryDataResponse{
-		Responses: dataResps,
-	}, nil
+	return response, nil
 }
 
 type queryModel struct {
@@ -121,113 +105,197 @@ type queryModel struct {
 	Operation      string `json:"Operation"`
 }
 
-// func (d *Datasource) query(ctx context.Context, pCtx backend.PluginContext, q backend.DataQuery) backend.DataResponse {
-// 	var response backend.DataResponse
-//
-// 	// Unmarshal the JSON into our queryModel.
-// 	var qm queryModel
-//
-// 	ctxLogger := log.DefaultLogger.FromContext(ctx)
-//
-// 	err := json.Unmarshal(q.JSON, &qm)
-// 	if err != nil {
-// 		ctxLogger.Error("Error while marshalling the query json")
-// 		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("json unmarshal: %v", err.Error()))
-// 	} else {
-// 		ctxLogger.Info("Query json is sucessfully marshalled operation: ")
-// 	}
-//
-// 	// create data frame response.
-// 	// For an overview on data frames and how grafana handles them:
-// 	// https://grafana.com/developers/plugin-tools/introduction/data-frames
-//
-// 	Nodeframe := data.NewFrame("Nodes")
-// 	// EdgeFrame := data.NewFrame("Edges")
-//
-// 	for _, field := range models.NodeframeFields {
-// 		var fieldConf = data.FieldConfig{
-// 			DisplayName: field.Config["displayName"],
-// 		}
-// 		var datafield = data.Field{
-// 			Name:   field.Name,
-// 			Config: &fieldConf,
-// 		}
-// 		Nodeframe.Fields = append(Nodeframe.Fields, &datafield)
-// 	}
-//
-// 	var frameMeta = data.FrameMeta{
-// 		PreferredVisualization: data.VisTypeNodeGraph,
-// 	}
-// 	Nodeframe.SetMeta(&frameMeta)
-// 	// EdgeFrame.SetMeta(&frameMeta)
-// 	// EdgeFrame := data.NewFrame("Edges")
-// 	// add the frames to the response.
-//
-// 	Nodegraph := getGraphData(ctx, d, qm)
-//
-// 	for _, node := range Nodegraph.Nodes {
-//
-// 		Nodeframe.AppendRow(node)
-// 	}
-//
-// 	// for _, edge := range Nodegraph.Edges {
-// 	// 	EdgeFrame.AppendRow(edge)
-// 	// }
-//
-// 	response.Frames = append(response.Frames, Nodeframe)
-// 	// response.Frames = append(response.Frames, EdgeFrame)
-//
-// 	return response
-// }
+func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backend.DataQuery) backend.DataResponse {
+	var response backend.DataResponse
 
-func (d *Datasource) query(_ context.Context, _ backend.PluginContext, _ backend.DataQuery) backend.DataResponse {
+	// Unmarshal the JSON into our queryModel.
+	var qm queryModel
 
-	// var response backend.DataResponse
+	ctxLogger := log.DefaultLogger.FromContext(ctx)
 
-	// nodeFrame := data.NewFrame(
-	// 	"response",
-	// 	data.NewField("time", nil, []int{2, 3, 4}),
-	// 	data.NewField("values", nil, []int{34, 56, 78}),
-	// )
-	dataResp := backend.DataResponse{
-		Frames: []*data.Frame{
-			data.NewFrame(
-				"response",
-				data.NewField("time", nil, []int{2, 3, 4}),
-				data.NewField("values", nil, []int{34, 56, 78}),
-			),
-		},
+	err := json.Unmarshal(q.JSON, &qm)
+	if err != nil {
+		ctxLogger.Error("Error while marshalling the query json")
+		return backend.ErrDataResponse(backend.StatusBadRequest, fmt.Sprintf("json unmarshal: %v", err.Error()))
+	} else {
+		ctxLogger.Info("Query json is sucessfully marshalled operation: ")
 	}
-	// response.Frames = append(response.Frames, nodeFrame)
-	return dataResp
+
+	Nodegraph, tot, tty := getGraphData(ctx, d, qm)
+	NodeRows = len(Nodegraph.Nodes)
+	EdgeRows = len(Nodegraph.Edges)
+
+	Nodefields := getNodeFields(qm)
+	EdgeFields := getEdgeFields()
+
+	Nodeframe := data.NewFrame("Nodes")
+	Nodeframe.Fields = Nodefields
+	EdgeFrame := data.NewFrame("Edges")
+	EdgeFrame.Fields = EdgeFields
+
+	edgetest := models.EdgeFields{
+		ID:     "id",
+		Source: qm.NamespaceQuery,
+		Target: qm.Operation,
+	}
+	EdgeFrame.AppendRow(tty, string(qm.NamespaceQuery), fmt.Sprintf("%d", tot))
+	EdgeFrame.AppendRow(edgetest.ID, edgetest.Source, edgetest.Target)
+
+	var frameMeta = data.FrameMeta{
+		PreferredVisualization: data.VisTypeNodeGraph,
+	}
+	Nodeframe.SetMeta(&frameMeta)
+	EdgeFrame.SetMeta(&frameMeta)
+	// EdgeFrame := data.NewFrame("Edges")
+	// add the frames to the response.
+
+	for _, node := range Nodegraph.Nodes {
+		if qm.Operation == "Process" {
+
+			Nodeframe.AppendRow(
+				node.ID,
+				node.Title,
+				node.MainStat,
+				node.Color,
+				node.ChildNode,
+				// node.NodeRadius,
+				// node.Highlighted,
+				// int64(node.DetailTimestamp),
+				node.DetailClusterName,
+				node.DetailHostName,
+				node.DetailNamespaceName,
+				node.DetailPodName,
+				node.DetailLabels,
+				node.DetailContainerID,
+				node.DetailContainerName,
+				node.DetailContainerImage,
+				node.DetailParentProcessName,
+				node.DetailProcessName,
+				int64(node.DetailHostPPID),
+				int64(node.DetailHostPID),
+				int64(node.DetailPPID),
+				int64(node.DetailPID),
+				int64(node.DetailUID),
+				node.DetailType,
+				node.DetailSource,
+				node.DetailOperation,
+				node.DetailResource,
+				node.DetailData,
+				node.DetailResult,
+				node.DetailCwd,
+				node.DetailTTY,
+			)
+		} else if qm.Operation == "Network" {
+
+			Nodeframe.AppendRow(
+				node.ID,
+				node.Title,
+				node.MainStat,
+				node.Color,
+				node.ChildNode,
+				// node.NodeRadius,
+				// node.Highlighted,
+				// node.DetailTimestamp,
+				node.DetailClusterName,
+				node.DetailHostName,
+				node.DetailNamespaceName,
+				node.DetailPodName,
+				node.DetailLabels,
+				node.DetailContainerID,
+				node.DetailContainerName,
+				node.DetailContainerImage,
+				node.DetailParentProcessName,
+				node.DetailProcessName,
+				int64(node.DetailHostPPID),
+				int64(node.DetailHostPID),
+				int64(node.DetailPPID),
+				int64(node.DetailPID),
+				int64(node.DetailUID),
+				node.DetailType,
+				node.DetailSource,
+				node.DetailOperation,
+				node.DetailResource,
+				node.DetailData,
+				node.DetailResult,
+				node.DetailCwd,
+			)
+		}
+	}
+
+	for _, edge := range Nodegraph.Edges {
+		EdgeFrame.AppendRow(edge.ID, edge.Source, edge.Target)
+	}
+
+	response.Frames = append(response.Frames, Nodeframe)
+	response.Frames = append(response.Frames, EdgeFrame)
+
+	return response
 }
 
-func getGraphData(ctx context.Context, datasource *Datasource, MyQuery queryModel) models.NodeGraph {
+func getNodeFields(_ queryModel) []*data.Field {
 
+	fields := make([]*data.Field, len(models.NodeframeFields))
+	for i, field := range models.NodeframeFields {
+		// if qm.Operation == "Network" && field.Name == "detail__TTY" {
+		// 	continue
+		// }
+		f := data.NewFieldFromFieldType(field.Type, 0)
+		f.Name = field.Name
+		fields[i] = f
+
+	}
+
+	return fields
+}
+
+func getEdgeFields() []*data.Field {
+
+	fields := make([]*data.Field, len(models.EdgeframeFields))
+	for i, field := range models.EdgeframeFields {
+		f := data.NewFieldFromFieldType(field.Type, 0)
+		f.Name = field.Name
+
+		fields[i] = f
+
+	}
+
+	return fields
+}
+
+func getGraphData(ctx context.Context, datasource *Datasource, MyQuery queryModel) (models.NodeGraph, int, string) {
+
+	ctxLogger := log.DefaultLogger.FromContext(ctx)
 	var endpoint = ""
 	var logs = []models.Log{}
+	var total = 0
+
+	var TTY = ""
 	switch Backend {
 	case "ELASTICSEARCH":
 		endpoint = "/_search?size=1000&pretty"
-		if MyQuery.Operation == "Operation" {
-			endpoint = endpoint + "&q=TTY:pts0"
-		} else {
-
-			endpoint = endpoint + "&q=Operation=Network"
-		}
+		// if MyQuery.Operation == "Process" {
+		// 	endpoint = endpoint + "&q=TTY:pts0"
+		// } else {
+		//
+		// 	endpoint = endpoint + "&q=Operation=Network"
+		// }
 
 		datasourceURL := datasource.settings.URL + endpoint
 		// Do HTTP request
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, datasourceURL, nil)
 
 		if err != nil {
-			fmt.Errorf("request error :%w", err)
+			ctxLogger.Error("request error :", err)
 		}
 
 		resp, err := datasource.httpClient.Do(req)
+		if err != nil {
+			ctxLogger.Error("load settings: failed to load settings")
+			return models.NodeGraph{}, 0, ""
+		}
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Errorf("check health: failed to close response body %w", err.Error())
+				ctxLogger.Error("check health: failed to close response body", "err", err.Error())
 			}
 		}()
 		var ESResponse models.ElasticsearchResponse
@@ -237,7 +305,9 @@ func getGraphData(ctx context.Context, datasource *Datasource, MyQuery queryMode
 		}
 		for _, item := range ESResponse.Hits.Hits {
 			logs = append(logs, item.Source)
+			TTY = item.Source.TTY
 		}
+		total = len(logs)
 		break
 	case "LOKI":
 		endpoint = "/"
@@ -259,7 +329,7 @@ func getGraphData(ctx context.Context, datasource *Datasource, MyQuery queryMode
 		resp, err := datasource.httpClient.Do(req)
 		defer func() {
 			if err := resp.Body.Close(); err != nil {
-				fmt.Errorf("check health: failed to close response body %w", err.Error())
+				ctxLogger.Error("check health: failed to close response body %w", err.Error())
 			}
 		}()
 		var LokiResponse models.LokiSearchResponse
@@ -315,7 +385,7 @@ func getGraphData(ctx context.Context, datasource *Datasource, MyQuery queryMode
 		break
 	}
 
-	return NodeGraphData
+	return NodeGraphData, total, TTY
 }
 
 func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
@@ -325,33 +395,27 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 	var processLogs []models.Log
 
 	for _, log := range logs {
+
 		if log.TTY == pts0 &&
-			log.Operation == MyQuery.Operation &&
-			(MyQuery.NamespaceQuery == "All" || log.NamespaceName == MyQuery.NamespaceQuery) &&
+			log.Operation == MyQuery.Operation && (MyQuery.NamespaceQuery == "All" || log.NamespaceName == MyQuery.NamespaceQuery) &&
 			(MyQuery.LabelQuery == "All" || log.Labels == MyQuery.LabelQuery) {
 			processLogs = append(processLogs, log)
 		}
+
 	}
 
 	/* Nodes */
 
-	var containerNodes []models.NodeFields
-
 	var ProcessNodes []models.NodeFields
 
-	var FinalNodes []models.NodeFields
-
-	var processEdgesNodes []models.NodeFields
 	var processEdges []models.EdgeFields
-	var containerEdges []models.EdgeFields
-	var FinalEdges []models.EdgeFields
 
 	for _, log := range processLogs {
 		isBlocked := log.Result == denied
 
 		if log.PPID == 0 {
 			colorIndex := random(0, len(colors)-1)
-			containerNode := models.NodeFields{
+			cnode := models.NodeFields{
 				ID:                  log.ContainerName + log.NamespaceName,
 				Title:               log.ContainerName,
 				Color:               colors[colorIndex],
@@ -360,15 +424,32 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 				DetailNamespaceName: log.NamespaceName,
 			}
 
-			containerNodes = append(containerNodes, containerNode)
+			ProcessNodes = append(ProcessNodes, cnode)
+
+			edge := models.EdgeFields{
+				ID:     fmt.Sprintf("%s%s%s%s", cnode.ID, cnode.ChildNode, cnode.DetailNamespaceName, cnode.DetailContainerName),
+				Source: fmt.Sprintf("%s", cnode.ID),
+				Target: fmt.Sprintf("%s", cnode.ChildNode),
+			}
+
+			processEdges = append(processEdges, edge)
+
+		} else {
+
+			edge := models.EdgeFields{
+				ID:     fmt.Sprintf("%s%d%d", fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName), log.PPID, log.HostPID),
+				Source: fmt.Sprintf("%d%s%s", log.HostPPID, log.ContainerName, log.NamespaceName),
+				Target: fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName),
+			}
+			processEdges = append(processEdges, edge)
 		}
 
 		node := models.NodeFields{
-			ID:                      fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName),
-			Title:                   log.ProcessName,
-			MainStat:                log.Source,
-			Color:                   "white",
-			DetailTimestamp:         log.Timestamp,
+			ID:       fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName),
+			Title:    log.ProcessName,
+			MainStat: log.Source,
+			Color:    "white",
+			// DetailTimestamp:         log.Timestamp,
 			DetailClusterName:       log.ClusterName,
 			DetailHostName:          log.HostName,
 			DetailNamespaceName:     log.NamespaceName,
@@ -379,11 +460,11 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 			DetailContainerImage:    log.ContainerImage,
 			DetailParentProcessName: log.ParentProcessName,
 			DetailProcessName:       log.ProcessName,
-			DetailHostPPID:          log.HostPPID,
-			DetailHostPID:           log.HostPID,
-			DetailPPID:              log.PPID,
-			DetailPID:               log.PID,
-			DetailUID:               log.UID,
+			DetailHostPPID:          int64(log.HostPPID),
+			DetailHostPID:           int64(log.HostPID),
+			DetailPPID:              int64(log.PPID),
+			DetailPID:               int64(log.PID),
+			DetailUID:               int64(log.UID),
 			DetailType:              log.Type,
 			DetailSource:            log.Source,
 			DetailOperation:         log.Operation,
@@ -401,42 +482,10 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 		ProcessNodes = append(ProcessNodes, node)
 
 	}
-	FinalNodes = append(FinalNodes, ProcessNodes...)
-	FinalNodes = append(FinalNodes, containerNodes...)
-
-	for _, node := range ProcessNodes {
-		if node.DetailPID != 0 {
-			processEdgesNodes = append(processEdgesNodes, node)
-		}
-
-	}
-
-	for _, pnode := range processEdgesNodes {
-		edge := models.EdgeFields{
-			ID:     fmt.Sprintf("%s%d%d", pnode.ID, pnode.DetailPPID, pnode.DetailHostPID),
-			Source: fmt.Sprintf("%d%s%s", pnode.DetailHostPPID, pnode.DetailContainerName, pnode.DetailNamespaceName),
-			Target: fmt.Sprintf("%d%s%s", pnode.DetailHostPID, pnode.DetailContainerName, pnode.DetailNamespaceName),
-		}
-		processEdges = append(processEdges, edge)
-	}
-
-	for _, cnode := range containerNodes {
-
-		edge := models.EdgeFields{
-			ID:     fmt.Sprintf("%s%s%s%s", cnode.ID, cnode.ChildNode, cnode.DetailNamespaceName, cnode.DetailContainerName),
-			Source: fmt.Sprintf("%s", cnode.ID),
-			Target: fmt.Sprintf("%s", cnode.ChildNode),
-		}
-		containerEdges = append(containerEdges, edge)
-
-	}
-
-	FinalEdges = append(FinalEdges, processEdges...)
-	FinalEdges = append(FinalEdges, containerEdges...)
 
 	var nodeGraph = models.NodeGraph{
-		Nodes: FinalNodes,
-		Edges: FinalEdges,
+		Nodes: ProcessNodes,
+		Edges: processEdges,
 	}
 
 	return nodeGraph
@@ -457,11 +506,11 @@ func getNetworkGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 		protocol := resourceMap["protocol"]
 
 		node := models.NodeFields{
-			ID:                      fmt.Sprintf("%s%s%s", log.Owner.Name, log.Owner.Namespace, log.Owner.Ref),
-			Title:                   log.Owner.Name,
-			MainStat:                log.Owner.Namespace,
-			Color:                   "white",
-			DetailTimestamp:         log.Timestamp,
+			ID:       fmt.Sprintf("%s%s%s", log.Owner.Name, log.Owner.Namespace, log.Owner.Ref),
+			Title:    log.Owner.Name,
+			MainStat: log.Owner.Namespace,
+			Color:    "white",
+			// DetailTimestamp:         log.Timestamp,
 			DetailClusterName:       log.ClusterName,
 			DetailHostName:          log.HostName,
 			DetailNamespaceName:     log.NamespaceName,
@@ -472,11 +521,11 @@ func getNetworkGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 			DetailContainerImage:    log.ContainerImage,
 			DetailParentProcessName: log.ParentProcessName,
 			DetailProcessName:       log.ProcessName,
-			DetailHostPPID:          log.HostPPID,
-			DetailHostPID:           log.HostPID,
-			DetailPPID:              log.PPID,
-			DetailPID:               log.PID,
-			DetailUID:               log.UID,
+			DetailHostPPID:          int64(log.HostPPID),
+			DetailHostPID:           int64(log.HostPID),
+			DetailPPID:              int64(log.PPID),
+			DetailPID:               int64(log.PID),
+			DetailUID:               int64(log.UID),
 			DetailType:              log.Type,
 			DetailSource:            log.Source,
 			DetailOperation:         log.Operation,
@@ -484,7 +533,6 @@ func getNetworkGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 			DetailData:              log.Data,
 			DetailResult:            log.Result,
 			DetailCwd:               log.Cwd,
-			DetailTTY:               log.TTY,
 		}
 
 		if log.Result == denied {
@@ -567,7 +615,16 @@ func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRe
 	config, err := models.LoadPluginSettings(*req.PluginContext.DataSourceInstanceSettings)
 	ctxLogger := log.DefaultLogger.FromContext(ctx)
 
-	healthendpoint := d.settings.URL + "/_cluster/health"
+	healthendpoint := d.settings.URL
+	switch config.Backend {
+	case "ELASTICSEARCH":
+		healthendpoint += "/_cluster/health"
+		break
+	case "LOKI":
+		healthendpoint += "/ready"
+		break
+	}
+
 	r, err := http.NewRequestWithContext(ctx, http.MethodGet, healthendpoint, nil)
 
 	resp, err := d.httpClient.Do(r)
@@ -585,6 +642,13 @@ func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRe
 		return res, nil
 	}
 
+	if resp.StatusCode != http.StatusOK {
+		res.Status = backend.HealthStatusError
+		res.Message = fmt.Sprintf("error on checking health check status from backend  %s", resp.Status)
+
+		return res, nil
+	}
+
 	if config.Secrets.ApiKey == "" {
 		res.Status = backend.HealthStatusError
 		res.Message = "API key is missing"
@@ -593,6 +657,6 @@ func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRe
 
 	return &backend.CheckHealthResult{
 		Status:  backend.HealthStatusOk,
-		Message: fmt.Sprintf("Data source is workinggggg %s %s", config.Path, resp.Status),
+		Message: fmt.Sprintf("Data source is working"),
 	}, nil
 }

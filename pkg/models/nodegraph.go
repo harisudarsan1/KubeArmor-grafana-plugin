@@ -1,5 +1,7 @@
 package models
 
+import "github.com/grafana/grafana-plugin-sdk-go/data"
+
 type NodeGraph struct {
 	Nodes []NodeFields
 	Edges []EdgeFields
@@ -7,20 +9,19 @@ type NodeGraph struct {
 
 type FrameFieldType struct {
 	Name   string            `json:"name"`
-	Type   interface{}       `json:"type"`
+	Type   data.FieldType    `json:"type"`
 	Config map[string]string `json:"config"`
 }
 
 type NodeFields struct {
-	ID          string `json:"id"`
-	Title       string `json:"title,omitempty"`
-	MainStat    string `json:"mainStat,omitempty"`
-	Color       string `json:"color,omitempty"`
-	ChildNode   string `json:"childNode,omitempty"`
-	NodeRadius  string `json:"nodeRadius,omitempty"`
-	Highlighted bool   `json:"highlighted,omitempty"`
+	ID        string `json:"id"`
+	Title     string `json:"title,omitempty"`
+	MainStat  string `json:"mainStat,omitempty"`
+	Color     string `json:"color,omitempty"`
+	ChildNode string `json:"childNode,omitempty"`
+	// NodeRadius  string `json:"nodeRadius,omitempty"`
+	// Highlighted bool   `json:"highlighted,omitempty"`
 
-	DetailTimestamp         int    `json:"detail__Timestamp,omitempty"`
 	DetailClusterName       string `json:"detail__ClusterName,omitempty"`
 	DetailHostName          string `json:"detail__HostName,omitempty"`
 	DetailNamespaceName     string `json:"detail__NamespaceName,omitempty"`
@@ -31,11 +32,11 @@ type NodeFields struct {
 	DetailContainerImage    string `json:"detail__ContainerImage,omitempty"`
 	DetailParentProcessName string `json:"detail__ParentProcessName,omitempty"`
 	DetailProcessName       string `json:"detail__ProcessName,omitempty"`
-	DetailHostPPID          int    `json:"detail__HostPPID,omitempty"`
-	DetailHostPID           int    `json:"detail__HostPID,omitempty"`
-	DetailPPID              int    `json:"detail__PPID,omitempty"`
-	DetailPID               int    `json:"detail__PID,omitempty"`
-	DetailUID               int    `json:"detail__UID,omitempty"`
+	DetailHostPPID          int64  `json:"detail__HostPPID,omitempty"`
+	DetailHostPID           int64  `json:"detail__HostPID,omitempty"`
+	DetailPPID              int64  `json:"detail__PPID,omitempty"`
+	DetailPID               int64  `json:"detail__PID,omitempty"`
+	DetailUID               int64  `json:"detail__UID,omitempty"`
 	DetailType              string `json:"detail__Type,omitempty"`
 	DetailSource            string `json:"detail__Source,omitempty"`
 	DetailOperation         string `json:"detail__Operation,omitempty"`
