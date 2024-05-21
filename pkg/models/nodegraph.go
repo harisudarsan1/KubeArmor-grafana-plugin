@@ -198,6 +198,9 @@ type HealthResponse struct {
 }
 
 type NetworkData struct {
+	NetworkType string `json:"networkType"`
+	SockType    string `json:"socktype"`
+
 	Kprobe   string `json:"kprobe,omitempty"`
 	Domain   string `json:"domain,omitempty"`
 	RemoteIP string `json:"remoteIP,omitempty"`

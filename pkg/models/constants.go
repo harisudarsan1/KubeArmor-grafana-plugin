@@ -23,6 +23,30 @@ var EdgeframeFields = []FrameFieldType{
 }
 
 // Define the equivalent Go representation of NodeframeFields
+var NetworkNodeframeFields = []FrameFieldType{
+
+	{
+		Name:   "id",
+		Type:   data.FieldTypeString,
+		Config: make(map[string]string),
+	},
+	{
+		Name:   "title",
+		Type:   data.FieldTypeString,
+		Config: make(map[string]string),
+	},
+	{
+		Name:   "mainStat",
+		Type:   data.FieldTypeString,
+		Config: make(map[string]string),
+	},
+	{
+		Name:   "color",
+		Type:   data.FieldTypeString,
+		Config: make(map[string]string),
+	},
+}
+
 var NodeframeFields = []FrameFieldType{
 	{
 		Name:   "id",
@@ -61,13 +85,13 @@ var NodeframeFields = []FrameFieldType{
 	// 		"displayName": "Timestamp",
 	// 	},
 	// },
-	{
-		Name: "detail__UpdatedTime",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Updated Time",
-		},
-	},
+	// {
+	// 	Name: "detail__ChildNode",
+	// 	Type: data.FieldTypeString,
+	// 	Config: map[string]string{
+	// 		"displayName": "Updated Time",
+	// 	},
+	// },
 	{
 		Name: "detail__ClusterName",
 		Type: data.FieldTypeString,
