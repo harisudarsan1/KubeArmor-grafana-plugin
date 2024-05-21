@@ -25,7 +25,7 @@ dist/
 artifacts/
 work/
 ci/
-
+accuknox-kubearmorplugin-datasource 
 # e2e test directories
 /test-results/
 /playwright-report/
