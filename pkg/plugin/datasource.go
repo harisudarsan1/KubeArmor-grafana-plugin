@@ -13,6 +13,7 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
 	"net/http"
+	"strconv"
 
 	"k8s.io/client-go/kubernetes"
 )
@@ -135,7 +136,7 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 
 	Nodegraph, _, _ := getGraphData(ctx, d, qm)
 
-	Nodefields := getNodeFields(qm)
+	Nodefields := getNodeFields()
 	EdgeFields := getEdgeFields()
 	NetworkFields := getNetworkNodeFields()
 
@@ -209,6 +210,8 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 				node.Title,
 				node.MainStat,
 				node.Color,
+				node.DetailPodName,
+				node.DetailNamespaceName,
 				// node.ChildNode,
 				// node.NodeRadius,
 				// node.Highlighted,
@@ -240,7 +243,7 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 	}
 
 	for _, edge := range Nodegraph.Edges {
-		EdgeFrame.AppendRow(edge.ID, edge.Source, edge.Target)
+		EdgeFrame.AppendRow(edge.ID, edge.Source, edge.Target, edge.Mainstat, edge.Count)
 	}
 
 	response.Frames = append(response.Frames, Nodeframe)
@@ -249,12 +252,15 @@ func (d *Datasource) query(ctx context.Context, _ backend.PluginContext, q backe
 	return response
 }
 
-func getNodeFields(qm queryModel) []*data.Field {
+func getNodeFields() []*data.Field {
 
 	fields := make([]*data.Field, len(models.NodeframeFields))
 	for i, field := range models.NodeframeFields {
 		f := data.NewFieldFromFieldType(field.Type, 0)
 		f.Name = field.Name
+		// if field.DisplayName != "" {
+		// 	f.Config.DisplayName = field.DisplayName
+		// }
 		fields[i] = f
 
 	}
@@ -459,6 +465,9 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 				ID:     fmt.Sprintf("%s%s%s%s", cnode.ID, cnode.ChildNode, cnode.DetailNamespaceName, cnode.DetailContainerName),
 				Source: fmt.Sprintf("%s", cnode.ID),
 				Target: fmt.Sprintf("%s", cnode.ChildNode),
+
+				Mainstat: fmt.Sprintf("%s", "ContainerEdge"),
+				Count:    "None",
 			}
 
 			processEdges = append(processEdges, edge)
@@ -466,9 +475,12 @@ func getProcessGraph(logs []models.Log, MyQuery queryModel) models.NodeGraph {
 		} else {
 
 			edge := models.EdgeFields{
-				ID:     fmt.Sprintf("%s%d%d", fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName), log.PPID, log.HostPID),
-				Source: fmt.Sprintf("%d%s%s", log.HostPPID, log.ContainerName, log.NamespaceName),
-				Target: fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName),
+				ID:       fmt.Sprintf("%s%d%d", fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName), log.PPID, log.HostPID),
+				Source:   fmt.Sprintf("%d%s%s", log.HostPPID, log.ContainerName, log.NamespaceName),
+				Target:   fmt.Sprintf("%d%s%s", log.HostPID, log.ContainerName, log.NamespaceName),
+				Mainstat: fmt.Sprintf("%s", log.Data),
+
+				Count: "None",
 			}
 			processEdges = append(processEdges, edge)
 		}
@@ -527,6 +539,7 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 	var networkLogs []models.Log
 	var NodeData = []models.NodeFields{}
 	var EdgeData = []models.EdgeFields{}
+	var EdgeMap = make(map[string]int)
 
 	for _, log := range logs {
 		if log.Operation == MyQuery.Operation {
@@ -535,27 +548,25 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 	}
 	for _, log := range networkLogs {
 
-		node := models.NodeFields{
-
-			ID:       fmt.Sprintf("%s%s%s", log.Owner.Name, log.Owner.Namespace, log.Owner.Ref),
-			Title:    log.Owner.Name,
-			MainStat: log.Owner.Namespace,
-			Color:    "white",
-		}
-
-		if log.Result == denied {
-			node.Color = "red"
-		}
 		datamap := extractdata(log.Data)
 
 		if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe {
 
 			kprobeData := datamap["kprobe"]
 			domainData := datamap["domain"]
+			ownertype := datamap["ownertype"]
 
 			resourceMap := extractdata(log.Resource)
 			remoteIP := resourceMap["remoteip"]
-			hostName := resourceMap["hostname"]
+			peerhostName := resourceMap["hostname"]
+			peerNamespace := resourceMap["namespace"]
+			podname := "SERVICE"
+			if ownertype == "pod" {
+
+				podname = resourceMap["podname"]
+
+			}
+
 			port := resourceMap["port"]
 			protocol := resourceMap["protocol"]
 
@@ -565,90 +576,72 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 				Kprobe:      kprobeData,
 				Domain:      domainData,
 				RemoteIP:    remoteIP,
-				HostName:    hostName,
+				HostName:    peerhostName,
 				Port:        port,
 				Protocol:    protocol,
 			}
 			var title = remoteIP
 
-			if hostName != "" {
-				title = hostName
+			if peerhostName != "" {
+				title = peerhostName
 			}
 
+			node := models.NodeFields{
+
+				ID:       fmt.Sprintf("%s%s", log.Owner.Name, log.Owner.Namespace),
+				Title:    log.Owner.Name,
+				MainStat: log.Owner.Namespace,
+				Color:    "white",
+			}
+
+			if log.Result == denied {
+				node.Color = "red"
+			}
 			switch kprobeData {
 			case "tcp_accept":
+				ID := fmt.Sprintf("%s%s%s%s%s", log.Owner.Name, peerhostName, port, remoteIP, protocol)
 				var NetworkGraph = models.NetworkGraph{
 					NData: networkData,
-					ID:    fmt.Sprintf("%s%s%s", log.Owner.Name, log.Owner.Namespace, remoteIP),
+					ID:    ID,
 					Source: models.NodeFields{
-						ID:       fmt.Sprintf("%s%s%s", remoteIP, port, protocol),
+						ID:       fmt.Sprintf("%s%s", title, peerNamespace),
 						Title:    fmt.Sprintf("%s", title),
-						MainStat: fmt.Sprintf("%s", protocol),
+						MainStat: fmt.Sprintf("%s", peerNamespace),
+
+						DetailPodName:       podname,
+						DetailNamespaceName: peerNamespace,
 
 						Color: "white",
 					},
 					Target: node,
 				}
 				networkGraphs = append(networkGraphs, NetworkGraph)
+				EdgeMap[ID] += 1
 
 				break
 			case "tcp_connect":
 
+				ID1 := fmt.Sprintf("%s%s%s%s%s", peerhostName, log.Owner.Name, port, remoteIP, protocol)
 				var NetworkGraph = models.NetworkGraph{
+
 					NData:  networkData,
-					ID:     fmt.Sprintf("%s%s%s", log.Owner.Name, log.Owner.Namespace, remoteIP),
+					ID:     ID1,
 					Source: node,
 					Target: models.NodeFields{
-						ID:       fmt.Sprintf("%s%s%s", remoteIP, port, protocol),
-						Title:    fmt.Sprintf("%s", title),
-						MainStat: fmt.Sprintf("%s", protocol),
-
-						Color: "white",
+						ID:                  fmt.Sprintf("%s%s", title, peerNamespace),
+						Title:               fmt.Sprintf("%s", title),
+						MainStat:            fmt.Sprintf("%s", protocol),
+						DetailPodName:       podname,
+						DetailNamespaceName: peerNamespace,
+						Color:               "white",
 					},
 				}
 				networkGraphs = append(networkGraphs, NetworkGraph)
+
+				EdgeMap[ID1] += 1
 				break
 			}
 
-		} else if containsSyscall := strings.Contains(log.Data, "syscall"); containsSyscall {
-
-			syscall := datamap["syscall"]
-
-			resourceMap := extractdata(log.Resource)
-			domainData := resourceMap["domain"]
-			socktype := resourceMap["type"]
-
-			protocol := resourceMap["protocol"]
-			// if strings.Contains(socktype, "SOCK_DGRAM") {
-			// 	protocol = "DNS"
-			// }
-
-			networkData = models.NetworkData{
-				NetworkType: syscall,
-				SockType:    socktype,
-				Kprobe:      "",
-				Domain:      domainData,
-				RemoteIP:    "",
-				Port:        "",
-				Protocol:    protocol,
-			}
-
-			if protocol == "DNS" {
-
-				var NetworkGraph = models.NetworkGraph{
-					NData:  networkData,
-					ID:     fmt.Sprintf("%s%s%s", log.Owner.Name, log.Owner.Namespace, networkData.NetworkType),
-					Source: node,
-					Target: models.NodeFields{
-						ID:       fmt.Sprintf("%s%s%s", networkData.NetworkType, networkData.SockType, networkData.Protocol),
-						Title:    fmt.Sprintf("%s", "DNS"),
-						MainStat: fmt.Sprintf("%s", protocol),
-
-						Color: "white",
-					},
-				}
-				networkGraphs = append(networkGraphs, NetworkGraph)
-			}
 		}
 
 	}
@@ -657,9 +650,11 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 		NodeData = append(NodeData, netGraph.Source)
 		NodeData = append(NodeData, netGraph.Target)
 		var edge = models.EdgeFields{
-			ID:     netGraph.ID,
-			Source: netGraph.Source.ID,
-			Target: netGraph.Target.ID,
+			ID:       netGraph.ID,
+			Source:   netGraph.Source.ID,
+			Target:   netGraph.Target.ID,
+			Mainstat: netGraph.NData.Protocol + " " + netGraph.NData.Port,
+			Count:    strconv.Itoa(EdgeMap[netGraph.ID]),
 		}
 		EdgeData = append(EdgeData, edge)
 

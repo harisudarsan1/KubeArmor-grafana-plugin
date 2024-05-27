@@ -6,251 +6,208 @@ import (
 
 var EdgeframeFields = []FrameFieldType{
 	{
-		Name:   "id",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "id",
+		Type: data.FieldTypeString,
 	},
 	{
-		Name:   "source",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "source",
+		Type: data.FieldTypeString,
 	},
 	{
-		Name:   "target",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "target",
+		Type: data.FieldTypeString,
+	},
+
+	{
+		Name: "mainstat",
+		Type: data.FieldTypeString,
+	},
+
+	{
+		Name:        "detail__Count",
+		Type:        data.FieldTypeString,
+		DisplayName: "Count",
 	},
 }
 
 // Define the equivalent Go representation of NodeframeFields
 var NetworkNodeframeFields = []FrameFieldType{
+	{
+		Name: "id",
+		Type: data.FieldTypeString,
+	},
+	{
+		Name: "title",
+		Type: data.FieldTypeString,
+	},
+	{
+		Name: "mainstat",
+		Type: data.FieldTypeString,
+	},
+	{
+		Name: "color",
+		Type: data.FieldTypeString,
+	},
 
 	{
-		Name:   "id",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "detail__ResourceName",
+		Type: data.FieldTypeString,
 	},
+
 	{
-		Name:   "title",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
-	},
-	{
-		Name:   "mainStat",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
-	},
-	{
-		Name:   "color",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "detail__NamespaceName",
+		Type: data.FieldTypeString,
 	},
 }
 
 var NodeframeFields = []FrameFieldType{
 	{
-		Name:   "id",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "id",
+		Type: data.FieldTypeString,
 	},
 	{
-		Name:   "title",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "title",
+		Type: data.FieldTypeString,
 	},
 	{
-		Name:   "mainStat",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "mainstat",
+		Type: data.FieldTypeString,
 	},
 	{
-		Name:   "color",
-		Type:   data.FieldTypeString,
-		Config: make(map[string]string),
+		Name: "color",
+		Type: data.FieldTypeString,
 	},
 	// {
-	// 	Name:   "nodeRadius",
-	// 	Type:   data.FieldTypeString,
-	// 	Config: make(map[string]string),
-	// },
-	// {
-	// 	Name:   "highlighted",
-	// 	Type:   data.FieldTypeBool,
-	// 	Config: make(map[string]string),
-	// },
-	// {
-	// 	Name: "detail__Timestamp",
-	// 	Type: data.FieldTypeInt64,
-	// 	Config: map[string]string{
-	// 		"displayName": "Timestamp",
-	// 	},
-	// },
-	// {
-	// 	Name: "detail__ChildNode",
+	// 	Name: "nodeRadius",
 	// 	Type: data.FieldTypeString,
-	// 	Config: map[string]string{
-	// 		"displayName": "Updated Time",
-	// 	},
+	// },
+	// {
+	// 	Name: "highlighted",
+	// 	Type: data.FieldTypeBool,
+	// },
+	// {
+	// 	Name:        "detail__Timestamp",
+	// 	Type:        data.FieldTypeInt64,
+	// 	DisplayName: "Timestamp",
+	// },
+	// {
+	// 	Name:        "detail__ChildNode",
+	// 	Type:        data.FieldTypeString,
+	// 	DisplayName: "Updated Time",
 	// },
 	{
-		Name: "detail__ClusterName",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Cluster Name",
-		},
+		Name:        "detail__ClusterName",
+		Type:        data.FieldTypeString,
+		DisplayName: "Cluster Name",
 	},
 	{
-		Name: "detail__HostName",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Host Name",
-		},
+		Name:        "detail__HostName",
+		Type:        data.FieldTypeString,
+		DisplayName: "Host Name",
 	},
 	{
-		Name: "detail__NamespaceName",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Namespace Name",
-		},
+		Name:        "detail__NamespaceName",
+		Type:        data.FieldTypeString,
+		DisplayName: "Namespace Name",
 	},
 	{
-		Name: "detail__PodName",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Pod Name",
-		},
+		Name:        "detail__PodName",
+		Type:        data.FieldTypeString,
+		DisplayName: "Pod Name",
 	},
 	{
-		Name: "detail__Labels",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Labels",
-		},
+		Name:        "detail__Labels",
+		Type:        data.FieldTypeString,
+		DisplayName: "Labels",
 	},
 	{
-		Name: "detail__ContainerID",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Container ID",
-		},
+		Name:        "detail__ContainerID",
+		Type:        data.FieldTypeString,
+		DisplayName: "Container ID",
 	},
 	{
-		Name: "detail__ContainerName",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Container Name",
-		},
+		Name:        "detail__ContainerName",
+		Type:        data.FieldTypeString,
+		DisplayName: "Container Name",
 	},
 	{
-		Name: "detail__ContainerImage",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Container Image",
-		},
+		Name:        "detail__ContainerImage",
+		Type:        data.FieldTypeString,
+		DisplayName: "Container Image",
 	},
 	{
-		Name: "detail__ParentProcessName",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Parent Process Name",
-		},
+		Name:        "detail__ParentProcessName",
+		Type:        data.FieldTypeString,
+		DisplayName: "Parent Process Name",
 	},
 	{
-		Name: "detail__ProcessName",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Process Name",
-		},
+		Name:        "detail__ProcessName",
+		Type:        data.FieldTypeString,
+		DisplayName: "Process Name",
 	},
 	{
-		Name: "detail__HostPPID",
-		Type: data.FieldTypeInt64,
-		Config: map[string]string{
-			"displayName": "Host PPID",
-		},
+		Name:        "detail__HostPPID",
+		Type:        data.FieldTypeInt64,
+		DisplayName: "Host PPID",
 	},
 	{
-		Name: "detail__HostPID",
-		Type: data.FieldTypeInt64,
-		Config: map[string]string{
-			"displayName": "Host PID",
-		},
+		Name:        "detail__HostPID",
+		Type:        data.FieldTypeInt64,
+		DisplayName: "Host PID",
 	},
 	{
-		Name: "detail__PPID",
-		Type: data.FieldTypeInt64,
-		Config: map[string]string{
-			"displayName": "PPID",
-		},
+		Name:        "detail__PPID",
+		Type:        data.FieldTypeInt64,
+		DisplayName: "PPID",
 	},
 	{
-		Name: "detail__PID",
-		Type: data.FieldTypeInt64,
-		Config: map[string]string{
-			"displayName": "PID",
-		},
+		Name:        "detail__PID",
+		Type:        data.FieldTypeInt64,
+		DisplayName: "PID",
 	},
 	{
-		Name: "detail__UID",
-		Type: data.FieldTypeInt64,
-		Config: map[string]string{
-			"displayName": "UID",
-		},
+		Name:        "detail__UID",
+		Type:        data.FieldTypeInt64,
+		DisplayName: "UID",
 	},
 	{
-		Name: "detail__Type",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Type",
-		},
+		Name:        "detail__Type",
+		Type:        data.FieldTypeString,
+		DisplayName: "Type",
 	},
 	{
-		Name: "detail__Source",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Source",
-		},
+		Name:        "detail__Source",
+		Type:        data.FieldTypeString,
+		DisplayName: "Source",
 	},
 	{
-		Name: "detail__Operation",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Operation",
-		},
+		Name:        "detail__Operation",
+		Type:        data.FieldTypeString,
+		DisplayName: "Operation",
 	},
 	{
-		Name: "detail__Resource",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Resource",
-		},
+		Name:        "detail__Resource",
+		Type:        data.FieldTypeString,
+		DisplayName: "Resource",
 	},
 	{
-		Name: "detail__Data",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Data",
-		},
+		Name:        "detail__Data",
+		Type:        data.FieldTypeString,
+		DisplayName: "Data",
 	},
 	{
-		Name: "detail__Result",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Result",
-		},
+		Name:        "detail__Result",
+		Type:        data.FieldTypeString,
+		DisplayName: "Result",
 	},
 	{
-		Name: "detail__Cwd",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "Cwd",
-		},
+		Name:        "detail__Cwd",
+		Type:        data.FieldTypeString,
+		DisplayName: "Cwd",
 	},
 	{
-		Name: "detail__TTY",
-		Type: data.FieldTypeString,
-		Config: map[string]string{
-			"displayName": "TTY",
-		},
+		Name:        "detail__TTY",
+		Type:        data.FieldTypeString,
+		DisplayName: "TTY",
 	},
 }

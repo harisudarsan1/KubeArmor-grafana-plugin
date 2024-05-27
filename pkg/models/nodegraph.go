@@ -8,9 +8,9 @@ type NodeGraph struct {
 }
 
 type FrameFieldType struct {
-	Name   string            `json:"name"`
-	Type   data.FieldType    `json:"type"`
-	Config map[string]string `json:"config"`
+	Name        string         `json:"name"`
+	Type        data.FieldType `json:"type"`
+	DisplayName string
 }
 
 type NodeFields struct {
@@ -84,6 +84,9 @@ type EdgeFields struct {
 	ID     string `json:"id"`
 	Source string `json:"source"`
 	Target string `json:"target"`
+
+	Mainstat string
+	Count    string
 }
 
 type Hits struct {
