@@ -204,6 +204,7 @@ type NetworkData struct {
 	Kprobe   string `json:"kprobe,omitempty"`
 	Domain   string `json:"domain,omitempty"`
 	RemoteIP string `json:"remoteIP,omitempty"`
+	HostName string `json:"remoteIP,omitempty"`
 	Port     string `json:"port,omitempty"`
 	Protocol string `json:"protocol,omitempty"`
 }

@@ -77,7 +77,7 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 		ClusterIPCache: clustercache,
 	}
 
-	go startInformers(client, ctxLogger)
+	// go startInformers(client, ctxLogger)
 	return &Datasource{
 		settings:   settings,
 		httpClient: cl,
@@ -572,6 +572,7 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 
 			resourceMap := extractdata(log.Resource)
 			remoteIP := resourceMap["remoteip"]
+			hostName := resourceMap["hostname"]
 			port := resourceMap["port"]
 			protocol := resourceMap["protocol"]
 
@@ -581,30 +582,32 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 				Kprobe:      kprobeData,
 				Domain:      domainData,
 				RemoteIP:    remoteIP,
+				HostName:    hostName,
 				Port:        port,
 				Protocol:    protocol,
 			}
 			// podInfo := getHostfromIP(remoteIP, datasource, ctxlogger)
-			podInfo := PodServiceInfo{
-				Type:           "POD",
-				DeploymentName: "Deployment",
-				ServiceName:    "Service",
-			}
 			var title = ""
 
-			if podInfo.Type == "" {
-				title = remoteIP
+			// if podInfo.Type == "" {
+			// 	title = remoteIP
+			// } else {
+			//
+			// 	switch podInfo.Type {
+			// 	case "POD":
+			// 		title = podInfo.DeploymentName
+			// 		break
+			// 	case "SERVICE":
+			// 		title = podInfo.ServiceName
+			// 		break
+			// 	}
+			//
+			// }
+
+			if hostName != "" {
+				title = hostName
 			} else {
-
-				switch podInfo.Type {
-				case "POD":
-					title = podInfo.DeploymentName
-					break
-				case "SERVICE":
-					title = podInfo.ServiceName
-					break
-				}
-
+				title = remoteIP
 			}
 
 			// if hostName != "" {
@@ -658,9 +661,9 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 			socktype := resourceMap["type"]
 
 			protocol := resourceMap["protocol"]
-			if strings.Contains(socktype, "SOCK_DGRAM") {
-				protocol = "DNS"
-			}
+			// if strings.Contains(socktype, "SOCK_DGRAM") {
+			// 	protocol = "DNS"
+			// }
 
 			networkData = models.NetworkData{
 				NetworkType: syscall,
@@ -711,54 +714,6 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 
 	return nodeGraph
 }
-
-// func getHostfromIP(targetIP string, datasource *Datasource, ctxlogger log.Logger) string {
-// 	ctx := context.TODO()
-// 	pods, err := datasource.DataClient.k8sClient.CoreV1().Pods("").List(ctx, metav1.ListOptions{})
-// 	nodes, err := datasource.DataClient.k8sClient.CoreV1().Nodes().List(ctx, metav1.ListOptions{})
-//
-// 	if err != nil {
-// 		ctxlogger.Error("Error while getting pod info %v", err)
-// 	}
-// 	var hostname string
-// 	hostname = ""
-// 	for _, pod := range pods.Items {
-// 		for _, podIP := range pod.Status.PodIPs {
-// 			if podIP.IP == targetIP {
-// 				hostname = pod.Spec.Hostname
-// 				break
-// 			}
-// 		}
-// 		if hostname != "" {
-// 			break
-// 		}
-// 	}
-//
-// 	if hostname == "" {
-//
-// 		for _, node := range nodes.Items {
-// 			for _, addr := range node.Status.Addresses {
-// 				if addr.Type == "InternalIP" && addr.Address == targetIP {
-// 					hostname = node.Name
-// 				}
-// 			}
-// 		}
-//
-// 		if hostname == "" {
-// 			names, err := net.LookupAddr(targetIP)
-// 			if err != nil {
-// 				ctxlogger.Error("Error while doing reverse DNS lookup %v\n", err)
-// 			}
-// 			if len(names) > 0 {
-// 				hostname = names[0]
-// 			}
-//
-// 		}
-//
-// 	}
-//
-// 	return hostname
-// }
 
 func getHostfromIP(targetIP string, datasource *Datasource, ctxlogger log.Logger) PodServiceInfo {
 
