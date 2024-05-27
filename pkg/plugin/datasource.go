@@ -4,31 +4,17 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"os/signal"
 	"strings"
-	"sync"
-	"time"
 
-	"os"
-	"syscall"
-
-	// "net"
-	// "io"
-	"net/http"
-	// "time"
 	"github.com/accuknox/kubearmor-plugin/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/httpclient"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
+	"net/http"
 
-	// metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 	"k8s.io/client-go/kubernetes"
-
-	v1 "k8s.io/api/core/v1"
-	"k8s.io/client-go/informers"
-	"k8s.io/client-go/tools/cache"
 )
 
 var (
@@ -48,7 +34,6 @@ var ipPodCache = make(map[string]PodServiceInfo)
 // NewDatasource creates a new datasource instance.
 func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSettings) (instancemgmt.Instance, error) {
 
-	ctxLogger := log.DefaultLogger.FromContext(ctx)
 	opts, err := settings.HTTPClientOptions(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("http client options: %w", err)
@@ -58,30 +43,29 @@ func NewDatasource(ctx context.Context, settings backend.DataSourceInstanceSetti
 	if err != nil {
 		return nil, fmt.Errorf("Error in plugin settings: %w", err)
 	}
-	clientset := getK8sClient(ctxLogger)
+	// clientset := getK8sClient(ctxLogger)
 
 	Backend = PluginSettings.Backend
-	mux := &sync.RWMutex{}
-	clustercache := &ClusterCache{
-		ipPodCache: make(map[string]PodServiceInfo),
-		mu:         mux,
-	}
+	// mux := &sync.RWMutex{}
+	// clustercache := &ClusterCache{
+	// 	ipPodCache: make(map[string]PodServiceInfo),
+	// 	mu:         mux,
+	// }
 
 	cl, err := httpclient.New(opts)
 	if err != nil {
 		return nil, fmt.Errorf("httpclient new: %w", err)
 	}
 
-	client := &Client{
-		k8sClient:      clientset,
-		ClusterIPCache: clustercache,
-	}
+	// client := &Client{
+	// 	k8sClient:      clientset,
+	// 	ClusterIPCache: clustercache,
+	// }
 
 	// go startInformers(client, ctxLogger)
 	return &Datasource{
 		settings:   settings,
 		httpClient: cl,
-		DataClient: client,
 	}, nil
 }
 
@@ -91,7 +75,6 @@ type Datasource struct {
 	settings backend.DataSourceInstanceSettings
 
 	httpClient *http.Client
-	DataClient *Client
 }
 type Client struct {
 	k8sClient      *kubernetes.Clientset
@@ -546,7 +529,7 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 	var EdgeData = []models.EdgeFields{}
 
 	for _, log := range logs {
-		if log.Operation == MyQuery.Operation && log.NamespaceName == "wordpress-mysql" {
+		if log.Operation == MyQuery.Operation {
 			networkLogs = append(networkLogs, log)
 		}
 	}
@@ -586,36 +569,11 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 				Port:        port,
 				Protocol:    protocol,
 			}
-			// podInfo := getHostfromIP(remoteIP, datasource, ctxlogger)
-			var title = ""
-
-			// if podInfo.Type == "" {
-			// 	title = remoteIP
-			// } else {
-			//
-			// 	switch podInfo.Type {
-			// 	case "POD":
-			// 		title = podInfo.DeploymentName
-			// 		break
-			// 	case "SERVICE":
-			// 		title = podInfo.ServiceName
-			// 		break
-			// 	}
-			//
-			// }
+			var title = remoteIP
 
 			if hostName != "" {
 				title = hostName
-			} else {
-				title = remoteIP
 			}
-
-			// if hostName != "" {
-			// 	title = hostName
-			// } else {
-			// 	ctxlogger.Info("cannot lookup the remoteIP")
-			// 	title = remoteIP
-			// }
 
 			switch kprobeData {
 			case "tcp_accept":
@@ -713,137 +671,6 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 	}
 
 	return nodeGraph
-}
-
-func getHostfromIP(targetIP string, datasource *Datasource, ctxlogger log.Logger) PodServiceInfo {
-
-	podInfo, ok := datasource.DataClient.ClusterIPCache.Get(targetIP)
-	if !ok {
-		ctxlogger.Info("Cannot find the target IP")
-	}
-
-	return podInfo
-}
-
-func startInformers(client *Client, ctxlogger log.Logger) {
-
-	informerFactory := informers.NewSharedInformerFactory(client.k8sClient, time.Minute*10)
-	ctxlogger.Info("Created Informer Factory")
-
-	podInformer := informerFactory.Core().V1().Pods().Informer()
-	ctxlogger.Info("Initialized Pod informer")
-
-	// Set up event handlers for Pods
-	podInformer.AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-
-				pod := obj.(*v1.Pod)
-				deploymentName := getDeploymentNamefromPod(pod)
-				podInfo := PodServiceInfo{
-					Type:           "POD",
-					PodName:        pod.Name,
-					DeploymentName: deploymentName,
-				}
-
-				ctxlogger.Info("Adding podinfo for ip %s", pod.Status.PodIP)
-				client.ClusterIPCache.Set(pod.Status.PodIP, podInfo)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-
-				pod := newObj.(*v1.Pod)
-				deploymentName := getDeploymentNamefromPod(pod)
-				podInfo := PodServiceInfo{
-
-					Type:           "POD",
-					PodName:        pod.Name,
-					DeploymentName: deploymentName,
-				}
-				client.ClusterIPCache.Set(pod.Status.PodIP, podInfo)
-			},
-			DeleteFunc: func(obj interface{}) {
-
-				pod := obj.(*v1.Pod)
-
-				client.ClusterIPCache.Delete(pod.Status.PodIP)
-			},
-		},
-	)
-
-	// Get the Service informer
-	serviceInformer := informerFactory.Core().V1().Services().Informer()
-
-	ctxlogger.Info("Initialized Service informer")
-	// Set up event handlers
-	serviceInformer.AddEventHandler(
-		cache.ResourceEventHandlerFuncs{
-			AddFunc: func(obj interface{}) {
-				service := obj.(*v1.Service)
-
-				svcInfo := PodServiceInfo{
-
-					Type:           "Service",
-					ServiceName:    service.Name,
-					DeploymentName: "",
-				}
-				client.ClusterIPCache.Set(service.Spec.ClusterIP, svcInfo)
-				ctxlogger.Info("Adding serviceinfo for ip %s", service.Spec.ClusterIP)
-			},
-			UpdateFunc: func(oldObj, newObj interface{}) {
-				service := newObj.(*v1.Service)
-
-				svcInfo := PodServiceInfo{
-
-					Type:           "Service",
-					ServiceName:    service.Name,
-					DeploymentName: "",
-				}
-				client.ClusterIPCache.Set(service.Spec.ClusterIP, svcInfo)
-				fmt.Printf("Service Updated: %s/%s\n", service.Namespace, service.Name)
-			},
-			DeleteFunc: func(obj interface{}) {
-				service := obj.(*v1.Service)
-
-				client.ClusterIPCache.Delete(service.Spec.ClusterIP)
-				fmt.Printf("Service Deleted: %s/%s\n", service.Namespace, service.Name)
-			},
-		},
-	)
-
-	// Start the informer
-	stopCh := make(chan struct{})
-	defer close(stopCh)
-
-	go informerFactory.Start(stopCh)
-
-	// Wait for signals to exit
-	sigs := make(chan os.Signal, 1)
-	signal.Notify(sigs, syscall.SIGINT, syscall.SIGTERM)
-	<-sigs
-}
-
-func getDeploymentNamefromPod(pod *v1.Pod) string {
-	for _, ownerReference := range pod.OwnerReferences {
-		if ownerReference.Kind == "ReplicaSet" || ownerReference.Kind == "Deployment" || ownerReference.Kind == "Daemonset" {
-			// Get the deployment name from the ReplicaSet name
-			return ownerReference.Name
-		}
-	}
-
-	return ""
-}
-
-// func getDeploymentfromService(svc *v1.Service)string{
-// 	for _,svRef := range svc.OwnerReferences{
-// 		if svRef.Kind
-// 	}
-// }
-
-func getServiceInfo(service *v1.Service) PodServiceInfo {
-	info := PodServiceInfo{
-		ServiceName: service.Name,
-	}
-	return info
 }
 
 func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRequest) (*backend.CheckHealthResult, error) {
