@@ -4,7 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"math"
 	"strings"
+
+	"net/http"
+	"strconv"
 
 	"github.com/accuknox/kubearmor-plugin/pkg/models"
 	"github.com/grafana/grafana-plugin-sdk-go/backend"
@@ -12,8 +16,6 @@ import (
 	"github.com/grafana/grafana-plugin-sdk-go/backend/instancemgmt"
 	"github.com/grafana/grafana-plugin-sdk-go/backend/log"
 	"github.com/grafana/grafana-plugin-sdk-go/data"
-	"net/http"
-	"strconv"
 
 	"k8s.io/client-go/kubernetes"
 )
@@ -258,9 +260,12 @@ func getNodeFields() []*data.Field {
 	for i, field := range models.NodeframeFields {
 		f := data.NewFieldFromFieldType(field.Type, 0)
 		f.Name = field.Name
-		// if field.DisplayName != "" {
-		// 	f.Config.DisplayName = field.DisplayName
-		// }
+		if field.DisplayName != "" {
+			f.Config = &data.FieldConfig{
+				DisplayName:       field.DisplayName,
+				DisplayNameFromDS: field.DisplayName,
+			}
+		}
 		fields[i] = f
 
 	}
@@ -274,6 +279,12 @@ func getNetworkNodeFields() []*data.Field {
 	for i, field := range models.NetworkNodeframeFields {
 		f := data.NewFieldFromFieldType(field.Type, 0)
 		f.Name = field.Name
+		if field.DisplayName != "" {
+			f.Config = &data.FieldConfig{
+				DisplayName:       field.DisplayName,
+				DisplayNameFromDS: field.DisplayName,
+			}
+		}
 		fields[i] = f
 
 	}
@@ -288,6 +299,13 @@ func getEdgeFields() []*data.Field {
 	for i, field := range models.EdgeframeFields {
 		f := data.NewFieldFromFieldType(field.Type, 0)
 		f.Name = field.Name
+
+		if field.DisplayName != "" {
+			f.Config = &data.FieldConfig{
+				DisplayName:       field.DisplayName,
+				DisplayNameFromDS: field.DisplayName,
+			}
+		}
 
 		fields[i] = f
 
@@ -311,7 +329,7 @@ func getGraphData(ctx context.Context, datasource *Datasource, MyQuery queryMode
 			endpoint = endpoint + "&q=TTY:pts0"
 		} else {
 
-			endpoint = endpoint + "&q=Operation=Network"
+			endpoint = endpoint + "&q=kprobe"
 		}
 
 		datasourceURL := datasource.settings.URL + endpoint
@@ -339,6 +357,7 @@ func getGraphData(ctx context.Context, datasource *Datasource, MyQuery queryMode
 			ctxLogger.Error("Failed to decode json %w", err)
 		}
 		for _, item := range ESResponse.Hits.Hits {
+			ctxLogger.Info(item.Source.Resource)
 			logs = append(logs, item.Source)
 			TTY = item.Source.Operation
 		}
@@ -549,24 +568,30 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 	for _, log := range networkLogs {
 
 		datamap := extractdata(log.Data)
-
-		if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe {
-
+		containsHostname := strings.Contains(log.Resource, "hostname")
+		if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe && containsHostname {
+			/* Extracting from data field */
 			kprobeData := datamap["kprobe"]
 			domainData := datamap["domain"]
-			ownertype := datamap["ownertype"]
+			peertype := datamap["ownertype"]
+
+			// if peertype == "pod" || peertype == "service" {
+
+			/* Extracting from Resource field */
 
 			resourceMap := extractdata(log.Resource)
 			remoteIP := resourceMap["remoteip"]
 			peerhostName := resourceMap["hostname"]
 			peerNamespace := resourceMap["namespace"]
-			podname := "SERVICE"
-			if ownertype == "pod" {
-
-				podname = resourceMap["podname"]
+			podServiceName := resourceMap["podname"]
+			if peertype == "service" {
+				peerhostName += " SVC"
+				podServiceName = resourceMap["servicename"]
 
 			}
-
+			// if podServiceName == "" {
+			// 	podServiceName = log.PodName
+			// }
 			port := resourceMap["port"]
 			protocol := resourceMap["protocol"]
 
@@ -580,35 +605,52 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 				Port:        port,
 				Protocol:    protocol,
 			}
-			var title = remoteIP
 
-			if peerhostName != "" {
-				title = peerhostName
+			ownerName := log.PodName
+			ownerNamespace := log.NamespaceName
+
+			if log.Owner.Name != "" {
+				ownerName = log.Owner.Name
 			}
+
+			if log.Owner.Namespace != "" {
+				ownerNamespace = log.Owner.Namespace
+			}
+
+			// if ownerName == "" {
+			//
+			// 	ownerName = log.Source
+			// }
+			// if ownerNamespace == "" {
+			// 	ownerNamespace = log.NamespaceName
+			// }
 
 			node := models.NodeFields{
 
-				ID:       fmt.Sprintf("%s%s", log.Owner.Name, log.Owner.Namespace),
-				Title:    log.Owner.Name,
-				MainStat: log.Owner.Namespace,
-				Color:    "white",
+				ID:                  fmt.Sprintf("%s%s", log.PodName, log.NamespaceName),
+				Title:               ownerName,
+				MainStat:            log.PodName,
+				Color:               "white",
+				DetailPodName:       log.PodName,
+				DetailNamespaceName: ownerNamespace,
 			}
 
 			if log.Result == denied {
 				node.Color = "red"
 			}
+
 			switch kprobeData {
 			case "tcp_accept":
-				ID := fmt.Sprintf("%s%s%s%s%s", log.Owner.Name, peerhostName, port, remoteIP, protocol)
+				ID := fmt.Sprintf("%s%s%s%s%s", log.PodName, podServiceName, port, peerNamespace, protocol)
 				var NetworkGraph = models.NetworkGraph{
 					NData: networkData,
 					ID:    ID,
 					Source: models.NodeFields{
-						ID:       fmt.Sprintf("%s%s", title, peerNamespace),
-						Title:    fmt.Sprintf("%s", title),
-						MainStat: fmt.Sprintf("%s", peerNamespace),
+						ID:       fmt.Sprintf("%s%s", podServiceName, peerNamespace),
+						Title:    fmt.Sprintf("%s", peerhostName),
+						MainStat: fmt.Sprintf("%s", podServiceName),
 
-						DetailPodName:       podname,
+						DetailPodName:       podServiceName,
 						DetailNamespaceName: peerNamespace,
 
 						Color: "white",
@@ -621,17 +663,17 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 				break
 			case "tcp_connect":
 
-				ID1 := fmt.Sprintf("%s%s%s%s%s", peerhostName, log.Owner.Name, port, remoteIP, protocol)
+				ID1 := fmt.Sprintf("%s%s%s%s%s", podServiceName, log.PodName, port, peerNamespace, protocol)
 				var NetworkGraph = models.NetworkGraph{
 
 					NData:  networkData,
 					ID:     ID1,
 					Source: node,
 					Target: models.NodeFields{
-						ID:                  fmt.Sprintf("%s%s", title, peerNamespace),
-						Title:               fmt.Sprintf("%s", title),
+						ID:                  fmt.Sprintf("%s%s", podServiceName, peerNamespace),
+						Title:               fmt.Sprintf("%s", podServiceName),
 						MainStat:            fmt.Sprintf("%s", protocol),
-						DetailPodName:       podname,
+						DetailPodName:       podServiceName,
 						DetailNamespaceName: peerNamespace,
 						Color:               "white",
 					},
@@ -642,6 +684,8 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 				break
 			}
 
+			// }
+
 		}
 
 	}
@@ -649,6 +693,11 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 	for _, netGraph := range networkGraphs {
 		NodeData = append(NodeData, netGraph.Source)
 		NodeData = append(NodeData, netGraph.Target)
+
+		Reqcount := EdgeMap[netGraph.ID]
+		if Reqcount > 1 {
+			Reqcount = int(math.Floor(float64(Reqcount)))
+		}
 		var edge = models.EdgeFields{
 			ID:       netGraph.ID,
 			Source:   netGraph.Source.ID,
@@ -715,6 +764,6 @@ func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRe
 
 	return &backend.CheckHealthResult{
 		Status:  backend.HealthStatusOk,
-		Message: fmt.Sprintf("Data source is working"),
+		Message: fmt.Sprintf("Data source is working !!"),
 	}, nil
 }

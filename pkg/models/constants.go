@@ -26,7 +26,7 @@ var EdgeframeFields = []FrameFieldType{
 	{
 		Name:        "detail__Count",
 		Type:        data.FieldTypeString,
-		DisplayName: "Count",
+		DisplayName: "Request Count",
 	},
 }
 
@@ -50,13 +50,15 @@ var NetworkNodeframeFields = []FrameFieldType{
 	},
 
 	{
-		Name: "detail__ResourceName",
-		Type: data.FieldTypeString,
+		Name:        "detail__ResourceName",
+		Type:        data.FieldTypeString,
+		DisplayName: "ResourceName",
 	},
 
 	{
-		Name: "detail__NamespaceName",
-		Type: data.FieldTypeString,
+		Name:        "detail__NamespaceName",
+		Type:        data.FieldTypeString,
+		DisplayName: "Namespace",
 	},
 }
 

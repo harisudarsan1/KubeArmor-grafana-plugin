@@ -45,6 +45,8 @@ type NodeFields struct {
 	DetailResult            string `json:"detail__Result,omitempty"`
 	DetailCwd               string `json:"detail__Cwd,omitempty"`
 	DetailTTY               string `json:"detail__TTY,omitempty"`
+
+	DetailOwnerName string
 }
 
 // type KubeArmorLogs struct {
@@ -73,12 +75,6 @@ type NodeFields struct {
 // 	DetailCwd               string `json:"detail__Cwd,omitempty"`
 // 	DetailTTY               string `json:"detail__TTY,omitempty"`
 // }
-
-type Podowner struct {
-	Ref       string `json:"ref"`
-	Name      string `json:"Name"`
-	Namespace string `json:"Namespace"`
-}
 
 type EdgeFields struct {
 	ID     string `json:"id"`
@@ -166,32 +162,38 @@ type Stream struct {
 }
 
 type Log struct {
-	Timestamp         int      `json:"Timestamp,omitempty"`
-	UpdatedTime       string   `json:"UpdatedTime"`
-	ClusterName       string   `json:"ClusterName"`
-	HostName          string   `json:"HostName"`
-	NamespaceName     string   `json:"NamespaceName"`
-	Owner             Podowner `json:"Owner"`
-	PodName           string   `json:"PodName"`
-	Labels            string   `json:"Labels"`
-	ContainerID       string   `json:"ContainerID"`
-	ContainerName     string   `json:"ContainerName"`
-	ContainerImage    string   `json:"ContainerImage"`
-	ParentProcessName string   `json:"ParentProcessName"`
-	ProcessName       string   `json:"ProcessName"`
-	HostPPID          int      `json:"HostPPID"`
-	HostPID           int      `json:"HostPID"`
-	PPID              int      `json:"PPID"`
-	PID               int      `json:"PID"`
-	UID               int      `json:"UID"`
-	Type              string   `json:"Type"`
-	Source            string   `json:"Source"`
-	Operation         string   `json:"Operation"`
-	Resource          string   `json:"Resource"`
-	Data              string   `json:"Data"`
-	Result            string   `json:"Result"`
-	Cwd               string   `json:"Cwd"`
-	TTY               string   `json:"TTY,omitempty"`
+	Timestamp         int    `json:"Timestamp,omitempty"`
+	UpdatedTime       string `json:"UpdatedTime"`
+	ClusterName       string `json:"ClusterName"`
+	HostName          string `json:"HostName"`
+	NamespaceName     string `json:"NamespaceName"`
+	Owner             Owner  `json:"Owner"`
+	PodName           string `json:"PodName"`
+	Labels            string `json:"Labels"`
+	ContainerID       string `json:"ContainerID"`
+	ContainerName     string `json:"ContainerName"`
+	ContainerImage    string `json:"ContainerImage"`
+	ParentProcessName string `json:"ParentProcessName"`
+	ProcessName       string `json:"ProcessName"`
+	HostPPID          int    `json:"HostPPID"`
+	HostPID           int    `json:"HostPID"`
+	PPID              int    `json:"PPID"`
+	PID               int    `json:"PID"`
+	UID               int    `json:"UID"`
+	Type              string `json:"Type"`
+	Source            string `json:"Source"`
+	Operation         string `json:"Operation"`
+	Resource          string `json:"Resource"`
+	Data              string `json:"Data"`
+	Result            string `json:"Result"`
+	Cwd               string `json:"Cwd"`
+	TTY               string `json:"TTY,omitempty"`
+}
+
+type Owner struct {
+	Ref       string `json:"Ref"`
+	Name      string `json:"Name"`
+	Namespace string `json:"Namespace"`
 }
 
 type HealthResponse struct {
