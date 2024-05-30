@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"math"
 	"strings"
 
 	"net/http"
@@ -558,6 +557,8 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 	var networkLogs []models.Log
 	var NodeData = []models.NodeFields{}
 	var EdgeData = []models.EdgeFields{}
+	var EdgeAcceptMap = make(map[string]int)
+	var EdgeConnectMap = make(map[string]int)
 	var EdgeMap = make(map[string]int)
 
 	for _, log := range logs {
@@ -587,6 +588,7 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 			if peertype == "service" {
 				peerhostName += " SVC"
 				podServiceName = resourceMap["servicename"]
+				podServiceName += " SVC"
 
 			}
 			// if podServiceName == "" {
@@ -658,7 +660,7 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 					Target: node,
 				}
 				networkGraphs = append(networkGraphs, NetworkGraph)
-				EdgeMap[ID] += 1
+				EdgeAcceptMap[ID] += 1
 
 				break
 			case "tcp_connect":
@@ -671,8 +673,8 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 					Source: node,
 					Target: models.NodeFields{
 						ID:                  fmt.Sprintf("%s%s", podServiceName, peerNamespace),
-						Title:               fmt.Sprintf("%s", podServiceName),
-						MainStat:            fmt.Sprintf("%s", protocol),
+						Title:               fmt.Sprintf("%s", peerhostName),
+						MainStat:            fmt.Sprintf("%s", podServiceName),
 						DetailPodName:       podServiceName,
 						DetailNamespaceName: peerNamespace,
 						Color:               "white",
@@ -680,24 +682,118 @@ func getNetworkGraph(ctxlogger log.Logger, logs []models.Log, MyQuery queryModel
 				}
 				networkGraphs = append(networkGraphs, NetworkGraph)
 
-				EdgeMap[ID1] += 1
+				EdgeConnectMap[ID1] += 1
 				break
 			}
 
 			// }
 
+		} else if containsKprobe := strings.Contains(log.Data, "kprobe"); containsKprobe && !containsHostname {
+
+			kprobeData := datamap["kprobe"]
+			domainData := datamap["domain"]
+
+			resourceMap := extractdata(log.Resource)
+			remoteIP := resourceMap["remoteip"]
+
+			port := resourceMap["port"]
+			protocol := resourceMap["protocol"]
+
+			networkData = models.NetworkData{
+				NetworkType: "kprobe:" + kprobeData,
+				SockType:    "",
+				Kprobe:      kprobeData,
+				Domain:      domainData,
+				RemoteIP:    remoteIP,
+				HostName:    "External",
+				Port:        port,
+				Protocol:    protocol,
+			}
+
+			node := models.NodeFields{
+
+				ID:                  fmt.Sprintf("%s%s", log.PodName, log.NamespaceName),
+				Title:               log.PodName,
+				MainStat:            log.PodName,
+				Color:               "white",
+				DetailPodName:       log.PodName,
+				DetailNamespaceName: log.NamespaceName,
+			}
+
+			if log.Result == denied {
+				node.Color = "red"
+			}
+
+			switch kprobeData {
+			case "tcp_accept":
+				ID := fmt.Sprintf("%s%s%s%s%s", log.PodName, remoteIP, port, log.NamespaceName, protocol)
+				var NetworkGraph = models.NetworkGraph{
+					NData: networkData,
+					ID:    ID,
+					Source: models.NodeFields{
+						ID:       fmt.Sprintf("%s%s", remoteIP, "external"),
+						Title:    fmt.Sprintf("%s", remoteIP),
+						MainStat: fmt.Sprintf("%s", "External "),
+
+						DetailPodName:       "External",
+						DetailNamespaceName: "external",
+
+						Color: "white",
+					},
+					Target: node,
+				}
+				networkGraphs = append(networkGraphs, NetworkGraph)
+				EdgeAcceptMap[ID] += 1
+
+				break
+			case "tcp_connect":
+
+				ID1 := fmt.Sprintf("%s%s%s%s%s", log.PodName, remoteIP, port, log.NamespaceName, protocol)
+				var NetworkGraph = models.NetworkGraph{
+
+					NData:  networkData,
+					ID:     ID1,
+					Source: node,
+					Target: models.NodeFields{
+						ID:       fmt.Sprintf("%s%s", remoteIP, "external"),
+						Title:    fmt.Sprintf("%s", remoteIP),
+						MainStat: fmt.Sprintf("%s", "External "),
+
+						DetailPodName:       "External",
+						DetailNamespaceName: "external",
+
+						Color: "white",
+					},
+				}
+				networkGraphs = append(networkGraphs, NetworkGraph)
+
+				EdgeConnectMap[ID1] += 1
+				break
+			}
+
 		}
 
+	}
+
+	for key, value := range EdgeAcceptMap {
+		EdgeMap[key] = value
+	}
+
+	// Merge EdgeConnectMap into EdgeMap
+	for key, value := range EdgeConnectMap {
+		if _, exists := EdgeMap[key]; exists {
+			if EdgeMap[key] < EdgeConnectMap[key] {
+				EdgeMap[key] = value
+			}
+		} else {
+			EdgeMap[key] = value
+		}
 	}
 
 	for _, netGraph := range networkGraphs {
 		NodeData = append(NodeData, netGraph.Source)
 		NodeData = append(NodeData, netGraph.Target)
 
-		Reqcount := EdgeMap[netGraph.ID]
-		if Reqcount > 1 {
-			Reqcount = int(math.Floor(float64(Reqcount)))
-		}
 		var edge = models.EdgeFields{
 			ID:       netGraph.ID,
 			Source:   netGraph.Source.ID,
@@ -764,6 +860,6 @@ func (d *Datasource) CheckHealth(ctx context.Context, req *backend.CheckHealthRe
 
 	return &backend.CheckHealthResult{
 		Status:  backend.HealthStatusOk,
-		Message: fmt.Sprintf("Data source is working !!"),
+		Message: fmt.Sprintf("Data source is working "),
 	}, nil
 }
