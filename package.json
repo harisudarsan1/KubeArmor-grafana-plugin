@@ -1,6 +1,6 @@
 {
   "name": "kubearmor-plugin",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "A plugin for kube armor",
   "scripts": {
     "build": "webpack -c ./.config/webpack/webpack.config.ts --env production",
